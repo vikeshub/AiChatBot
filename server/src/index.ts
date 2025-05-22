@@ -16,18 +16,21 @@ if (!apiKey) {
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-// Store conversation context here (simple in-memory for all users)
+// Store conversation context (simple in-memory for now)
 let conversationHistory = [
   {
     role: "user",
-    content: "You can start the chat now.",
+    content:
+      "You are an assistant with access to real-time information provided by the user. Always use the current date and time provided when answering time-related questions.",
   },
 ];
+
 interface Message {
   role: string;
   content: string;
 }
-// Convert history to Gemini messages format
+
+// Convert to Gemini format
 function toGeminiMessages(history: Message[]) {
   return history.map((msg: Message) => ({
     role: msg.role === "assistant" ? "model" : msg.role,
@@ -39,18 +42,39 @@ app.post("/api/messages", async (req, res) => {
   const { message } = req.body;
 
   try {
-    // Add new user message to history
+    // Get current date/time (IST)
+    const now = new Date();
+    const dateTimeString = now.toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      dateStyle: "full",
+      timeStyle: "long",
+    });
+
+    // Inject real-time info only if message includes date/time keywords
+    const lowerMsg = message.toLowerCase();
+    const dateKeywords = ["date", "time", "day", "today", "current"];
+    const includesTimeQuery = dateKeywords.some((kw) =>
+      lowerMsg.includes(kw)
+    );
+
+    if (includesTimeQuery) {
+      conversationHistory.push({
+        role: "user",
+        content: `Current real-time date and time is: ${dateTimeString}`,
+      });
+    }
+
+    // Add user message
     conversationHistory.push({ role: "user", content: message });
 
-    // Convert entire conversation to Gemini format
+    // Convert to Gemini format
     const messages = toGeminiMessages(conversationHistory);
 
-    // Call Gemini with full conversation context
+    // Generate reply
     const result = await model.generateContent({ contents: messages });
-    const response =  result.response;
-    const replyText = response.text();
+    const replyText = result.response.text();
 
-    // Add assistant reply to history
+    // Add assistant's reply
     conversationHistory.push({ role: "assistant", content: replyText });
 
     res.json({ reply: replyText });
@@ -62,5 +86,5 @@ app.post("/api/messages", async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`✅ Server running on http://localhost:${PORT}`);
 });
