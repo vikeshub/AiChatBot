@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from "react";
 import axios from "axios";
-
+import { FaPaperclip } from "react-icons/fa";
 function App() {
   const [messages, setMessages] = useState([
     { sender: "system", text: "You can start the chat now." },
@@ -56,11 +56,15 @@ function App() {
     formData.append("pdf", pdfFile);
 
     try {
-      const res = await axios.post("http://localhost:5000/api/upload-pdf", formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
-      });
+      const res = await axios.post(
+        "http://localhost:5000/api/upload-pdf",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
       alert("PDF uploaded successfully!");
       setPdfFile(null);
       e.target.reset();
@@ -69,6 +73,31 @@ function App() {
       alert("Failed to upload PDF.");
     }
   };
+
+  const uploadPdfDirectly = async (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const formData = new FormData();
+  formData.append("pdf", file);
+
+  try {
+    const res = await axios.post(
+      "http://localhost:5000/api/upload-pdf",
+      formData,
+      {
+        headers: {
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    alert("PDF uploaded successfully!");
+  } catch (error) {
+    console.error(error);
+    alert("Failed to upload PDF.");
+  }
+};
+
 
   return (
     <div className="flex items-center justify-center h-screen bg-gray-100 p-4 gap-6">
@@ -101,7 +130,9 @@ function App() {
               )}
 
               {msg.sender === "system" ? (
-                <div className="text-center text-gray-500 w-full">{msg.text}</div>
+                <div className="text-center text-gray-500 w-full">
+                  {msg.text}
+                </div>
               ) : (
                 <div
                   className={`p-3 rounded-lg text-sm max-w-[75%] ${
@@ -124,16 +155,36 @@ function App() {
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Message input */}
         <div className="flex items-center mt-2">
+          {/* Clip Icon to trigger hidden file input */}
+          <label
+            htmlFor="pdf-upload-hidden"
+            className="p-3 cursor-pointer hover:bg-gray-200 rounded-l-md bg-white border border-r-0"
+            title="Upload PDF"
+          >
+            <FaPaperclip />
+          </label>
+
+          {/* Hidden File Input */}
+          <input
+            id="pdf-upload-hidden"
+            type="file"
+            accept="application/pdf"
+            onChange={uploadPdfDirectly}
+            className="hidden"
+          />
+
+          {/* Message Input */}
           <textarea
-            className="flex-1 p-2 border rounded-l-md outline-none resize-none"
+            className="flex-1 p-2 border-t border-b border-gray-300 outline-none resize-none"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleInputKeyDown}
             placeholder="Send a message..."
             rows={1}
           />
+
+          {/* Send Button */}
           <button
             className="bg-indigo-500 text-white px-4 py-2 rounded-r-md"
             onClick={sendMessage}
@@ -145,7 +196,7 @@ function App() {
       </div>
 
       {/* PDF Upload */}
-      <form
+      {/* <form
         onSubmit={uploadPdf}
         className="flex flex-col items-start gap-2 bg-white p-4 rounded-xl shadow-xl"
       >
@@ -164,7 +215,7 @@ function App() {
         >
           Upload PDF
         </button>
-      </form>
+      </form> */}
     </div>
   );
 }
