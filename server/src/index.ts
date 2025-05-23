@@ -1,6 +1,9 @@
-import express from "express";
+import express, { Request, Response } from "express";
 import dotenv from "dotenv";
 import cors from "cors";
+import multer from "multer";
+import fs from "fs";
+import pdfParse from "pdf-parse";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
@@ -13,6 +16,7 @@ const apiKey = process.env.GEMINI_API_KEY;
 if (!apiKey) {
   throw new Error("GEMINI_API_KEY is not set in the environment variables.");
 }
+
 const genAI = new GoogleGenerativeAI(apiKey);
 const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
@@ -38,7 +42,8 @@ function toGeminiMessages(history: Message[]) {
   }));
 }
 
-app.post("/api/messages", async (req, res) => {
+// Route 1: Gemini Chat with Real-Time Info
+app.post("/api/messages", async (req: Request, res: Response): Promise<void> => {
   const { message } = req.body;
 
   try {
@@ -50,7 +55,7 @@ app.post("/api/messages", async (req, res) => {
       timeStyle: "long",
     });
 
-    // Inject real-time info only if message includes date/time keywords
+    // Check if message asks about time/date
     const lowerMsg = message.toLowerCase();
     const dateKeywords = ["date", "time", "day", "today", "current"];
     const includesTimeQuery = dateKeywords.some((kw) =>
@@ -64,17 +69,15 @@ app.post("/api/messages", async (req, res) => {
       });
     }
 
-    // Add user message
+    // Add user message to history
     conversationHistory.push({ role: "user", content: message });
 
-    // Convert to Gemini format
+    // Generate reply from Gemini
     const messages = toGeminiMessages(conversationHistory);
-
-    // Generate reply
     const result = await model.generateContent({ contents: messages });
     const replyText = result.response.text();
 
-    // Add assistant's reply
+    // Save assistant response
     conversationHistory.push({ role: "assistant", content: replyText });
 
     res.json({ reply: replyText });
@@ -83,6 +86,25 @@ app.post("/api/messages", async (req, res) => {
     res.status(500).json({ error: "Failed to get response from Gemini" });
   }
 });
+
+// Setup Multer for PDF upload
+const upload = multer({ dest: "uploads/" });
+
+// Extend Request type to include file
+interface MulterRequest extends Request {
+  file: Express.Multer.File;
+}
+
+// Route 2: Upload PDF and summarize using Gemini
+app.post("/api/upload-pdf", upload.single("pdf"), async (req: Request, res: Response): Promise<void> => {
+  try {
+    // your logic here...
+    res.status(200).json({ message: "File uploaded successfully." });
+  } catch (error) {
+    res.status(500).json({ error: "Something went wrong." });
+  }
+});
+
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
