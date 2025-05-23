@@ -98,12 +98,34 @@ interface MulterRequest extends Request {
 // Route 2: Upload PDF and summarize using Gemini
 app.post("/api/upload-pdf", upload.single("pdf"), async (req: Request, res: Response): Promise<void> => {
   try {
-    // your logic here...
-    res.status(200).json({ message: "File uploaded successfully." });
+    const file = req.file as Express.Multer.File;
+    if (!file) {
+      res.status(400).json({ error: "No file uploaded" });
+      return;
+    }
+
+    const dataBuffer = fs.readFileSync(file.path);
+    const pdfData = await pdfParse(dataBuffer);
+    const pdfText = pdfData.text;
+
+    const prompt = `Please summarize the following PDF content:\n\n${pdfText}`;
+    conversationHistory.push({ role: "user", content: prompt });
+
+    const messages = toGeminiMessages(conversationHistory);
+    const result = await model.generateContent({ contents: messages });
+    const replyText = result.response.text();
+
+    conversationHistory.push({ role: "assistant", content: replyText });
+    fs.unlinkSync(file.path);
+
+    res.status(200).json({ summary: replyText });
+
   } catch (error) {
-    res.status(500).json({ error: "Something went wrong." });
+    console.error("Error processing PDF:", error);
+    res.status(500).json({ error: "Failed to process the PDF." });
   }
 });
+
 
 
 const PORT = process.env.PORT || 5000;
